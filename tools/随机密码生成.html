@@ -578,8 +578,8 @@
                   <div class="hint">8 - 32</div>
                 </div>
                 <div class="range-wrap">
-                  <input id="lengthRange" type="range" min="8" max="32" step="1" value="20" />
-                  <input id="lengthInput" class="input" type="number" min="8" max="32" step="1" value="20" />
+                  <input id="lengthRange" type="range" min="8" max="32" step="1" value="12" />
+                  <input id="lengthInput" class="input" type="number" min="8" max="32" step="1" value="12" />
                 </div>
               </div>
             </div>
@@ -592,7 +592,7 @@
                   <div class="label-row">
                     <div class="label">默认字符</div>
                   </div>
-                  <input id="requiredChars" class="input" type="text" value="_" />
+                  <input id="requiredChars" class="input" type="text" value="!@_" />
                 </div>
 
                 <div>
@@ -637,7 +637,7 @@
           </div>
           <div class="meta-box">
             <span class="k">当前长度</span>
-            <span id="metaLength" class="v">20</span>
+            <span id="metaLength" class="v">12</span>
           </div>
           <div class="meta-box">
             <span class="k">字符集大小</span>
@@ -653,7 +653,8 @@
   </div>
 
   <script>
-    const SYMBOLS = "!@#$%^&*()-+=.?";
+    const SYMBOLS = "!@_#$%&*-?.+=^()";
+    const DEFAULT_SYMBOLS = "!@_";
     const CHARS = {
       numbers: "0123456789",
       lowercase: "abcdefghijklmnopqrstuvwxyz",
@@ -684,7 +685,7 @@
     };
 
     let latestPasswords = [];
-    const selectedSymbols = new Set();
+    const selectedSymbols = new Set(DEFAULT_SYMBOLS);
 
     function escapeHtml(str) {
       return str
@@ -747,14 +748,17 @@
         btn.className = "symbol-chip";
         btn.textContent = symbol;
         btn.dataset.symbol = symbol;
+        btn.classList.toggle("active", selectedSymbols.has(symbol));
 
         btn.addEventListener("click", () => {
           if (selectedSymbols.has(symbol)) {
             selectedSymbols.delete(symbol);
             btn.classList.remove("active");
+            els.requiredChars.value = uniqueChars(els.requiredChars.value.replaceAll(symbol, ""));
           } else {
             selectedSymbols.add(symbol);
             btn.classList.add("active");
+            els.requiredChars.value = uniqueChars(els.requiredChars.value + symbol);
           }
           updateMeta();
         });
@@ -780,7 +784,7 @@
 
     function getConfig() {
       const count = clamp(els.countInput.value, 1, 10, 1);
-      const length = clamp(els.lengthInput.value, 8, 32, 20);
+      const length = clamp(els.lengthInput.value, 8, 32, 12);
       const requiredIncluded = getRequiredIncludedChars();
       const excluded = new Set((els.excludeChars.value || "").split(""));
       const fullCharset = buildCharset();
@@ -953,6 +957,20 @@
     }
 
     function bindEvents() {
+      els.requiredChars.addEventListener("input", () => {
+        [...SYMBOLS].forEach((symbol) => {
+          const isSelected = els.requiredChars.value.includes(symbol);
+          if (isSelected) {
+            selectedSymbols.add(symbol);
+          } else {
+            selectedSymbols.delete(symbol);
+          }
+
+          const btn = els.symbolGrid.querySelector(`[data-symbol="${CSS.escape(symbol)}"]`);
+          btn?.classList.toggle("active", isSelected);
+        });
+      });
+
       [
         els.useNumbers,
         els.useLowercase,
@@ -980,7 +998,7 @@
 
     renderSymbolButtons();
     syncPair(els.countRange, els.countInput, 1, 10, 1);
-    syncPair(els.lengthRange, els.lengthInput, 8, 32, 20);
+    syncPair(els.lengthRange, els.lengthInput, 8, 32, 12);
     bindEvents();
     updateMeta();
   </script>
