@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>逐个打开网址</title>
+<style>
+    * { box-sizing: border-box; }
+
+    body {
+        margin: 0;
+        padding: 32px 18px;
+        color: #263247;
+        background: #f3f5f9;
+        font-family: Arial, "Microsoft YaHei", sans-serif;
+    }
+
+    .container {
+        max-width: 860px;
+        margin: 0 auto;
+        padding: 30px;
+        background: #fff;
+        border-radius: 14px;
+        box-shadow: 0 5px 25px rgba(0, 0, 0, .07);
+    }
+
+    h1 { margin: 0 0 8px; text-align: center; font-size: 25px; }
+    .description { margin: 0 0 20px; text-align: center; color: #6c7789; font-size: 14px; }
+
+    textarea {
+        display: block;
+        width: 100%;
+        min-height: 190px;
+        padding: 14px;
+        border: 1px solid #d7dce5;
+        border-radius: 8px;
+        outline: none;
+        resize: vertical;
+        font: 14px/1.7 Arial, "Microsoft YaHei", sans-serif;
+    }
+    textarea:focus { border-color: #2878e8; box-shadow: 0 0 0 3px rgba(40, 120, 232, .1); }
+
+    .stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        margin-top: 14px;
+    }
+    .stat {
+        padding: 12px;
+        background: #f5f7fa;
+        border-radius: 8px;
+        text-align: center;
+        color: #687386;
+        font-size: 13px;
+    }
+    .stat strong { display: block; margin-bottom: 3px; color: #263247; font-size: 21px; }
+
+    .buttons { display: flex; gap: 10px; margin-top: 16px; }
+    button {
+        min-height: 46px;
+        padding: 10px 16px;
+        border: 0;
+        border-radius: 8px;
+        font-size: 15px;
+        cursor: pointer;
+    }
+    button:disabled { cursor: not-allowed; opacity: .48; }
+    .open-btn { flex: 2; color: #fff; background: #2878e8; font-weight: 600; }
+    .open-btn:not(:disabled):hover { background: #1765d1; }
+    .pause-btn, .clear-btn { flex: 1; color: #344054; background: #edf0f5; }
+    .pause-btn:not(:disabled):hover, .clear-btn:not(:disabled):hover { background: #e1e6ee; }
+
+    .message { min-height: 22px; margin-top: 13px; color: #2878e8; font-size: 14px; }
+    .message.error { color: #c62828; }
+
+    .list-heading { display: flex; justify-content: space-between; gap: 12px; margin: 22px 0 9px; }
+    .list-heading h2 { margin: 0; font-size: 16px; }
+    .list-heading span { color: #7b8493; font-size: 13px; }
+    .url-list {
+        max-height: 360px;
+        margin: 0;
+        padding: 0;
+        overflow: auto;
+        list-style: none;
+        border: 1px solid #e3e7ee;
+        border-radius: 8px;
+    }
+    .url-list:empty { display: none; }
+    .url-item {
+        display: grid;
+        grid-template-columns: 38px minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 10px;
+        min-height: 43px;
+        padding: 8px 12px;
+        border-bottom: 1px solid #edf0f4;
+        font-size: 13px;
+    }
+    .url-item:last-child { border-bottom: 0; }
+    .url-item.current { background: #edf5ff; }
+    .url-number { color: #7b8493; font-variant-numeric: tabular-nums; }
+    .url-text { overflow: hidden; color: #364152; text-overflow: ellipsis; white-space: nowrap; }
+    .url-text.invalid { color: #a3aab5; text-decoration: line-through; }
+    .url-status { color: #7b8493; white-space: nowrap; }
+    .url-item.opened .url-status { color: #16834b; }
+    .url-item.invalid .url-status { color: #bd5c31; }
+
+    .tip {
+        margin-top: 15px;
+        padding: 12px;
+        background: #f5f7fa;
+        border-radius: 8px;
+        color: #6c7789;
+        font-size: 12px;
+        line-height: 1.7;
+    }
+
+    @media (max-width: 600px) {
+        body { padding: 14px 10px; }
+        .container { padding: 20px 15px; }
+        .buttons { flex-wrap: wrap; }
+        .open-btn { flex: 1 1 100%; }
+        .pause-btn, .clear-btn { flex: 1; }
+        .url-item { grid-template-columns: 30px minmax(0, 1fr) auto; gap: 6px; padding-inline: 8px; }
+    }
+</style>
+</head>
+<body>
+<main class="container">
+    <h1>逐个打开网址</h1>
+    <p class="description">粘贴多个网址后，点击“打开下一个”；每次只打开一个新标签页。</p>
+
+    <textarea id="urlInput" aria-label="网址列表" placeholder="每行粘贴一个网址，例如：&#10;https://www.baidu.com&#10;https://www.github.com&#10;https://www.wikipedia.org"></textarea>
+
+    <section class="stats" aria-label="打开进度">
+        <div class="stat"><strong id="totalCount">0</strong>识别到网址</div>
+        <div class="stat"><strong id="openedCount">0</strong>已打开</div>
+        <div class="stat"><strong id="remainingCount">0</strong>剩余待打开</div>
+    </section>
+
+    <div class="buttons">
+        <button class="open-btn" id="openButton" type="button" disabled>打开下一个</button>
+        <button class="pause-btn" id="pauseButton" type="button" disabled>暂停队列</button>
+        <button class="clear-btn" id="clearButton" type="button">清空</button>
+    </div>
+
+    <div class="message" id="message" role="status" aria-live="polite">粘贴网址后，页面会自动编号并识别有效链接。</div>
+
+    <div class="list-heading">
+        <h2>网址队列</h2>
+        <span id="queueStatus">等待粘贴网址</span>
+    </div>
+    <ol class="url-list" id="urlList" aria-label="已识别的网址"></ol>
+
+    <div class="tip">
+        支持每行一个网址，也支持用空格、逗号或分号分隔；未写协议的域名会按 HTTPS 处理。每次点击只打开当前一条，成功后自动选中下一条。若浏览器拦截，请允许此页面打开弹出式窗口，再重试当前网址。
+    </div>
+</main>
+
+<script>
+    const urlInput = document.getElementById("urlInput");
+    const totalCount = document.getElementById("totalCount");
+    const openedCount = document.getElementById("openedCount");
+    const remainingCount = document.getElementById("remainingCount");
+    const openButton = document.getElementById("openButton");
+    const pauseButton = document.getElementById("pauseButton");
+    const clearButton = document.getElementById("clearButton");
+    const message = document.getElementById("message");
+    const queueStatus = document.getElementById("queueStatus");
+    const urlList = document.getElementById("urlList");
+
+    let entries = [];
+    let paused = false;
+
+    // 接受换行、空格、逗号和分号分隔的链接，并去掉常见包裹符号。
+    function getUrlTokens() {
+        return urlInput.value
+            .split(/[\s,，;；]+/)
+            .map(value => value.replace(/^[<(\[{“‘'"]+/, "").replace(/[>\])}”’'"]+$/, "").trim())
+            .filter(Boolean);
+    }
+
+    function parseUrl(value) {
+        const candidate = /^https?:\/\//i.test(value) ? value : `https://${value}`;
+        try {
+            const parsed = new URL(candidate);
+            return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.href : null;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    function getNextIndex() {
+        return entries.findIndex(entry => entry.url && !entry.opened);
+    }
+
+    function render() {
+        const opened = entries.filter(entry => entry.opened).length;
+        const remaining = entries.filter(entry => entry.url && !entry.opened).length;
+        const nextIndex = getNextIndex();
+
+        totalCount.textContent = entries.length;
+        openedCount.textContent = opened;
+        remainingCount.textContent = remaining;
+        openButton.disabled = paused || nextIndex === -1;
+        pauseButton.disabled = entries.length === 0 || remaining === 0;
+        pauseButton.textContent = paused ? "继续队列" : "暂停队列";
+        queueStatus.textContent = entries.length === 0
+            ? "等待粘贴网址"
+            : paused ? "已暂停" : remaining === 0 ? "已完成" : `下一条：第 ${nextIndex + 1} 个`;
+
+        urlList.replaceChildren();
+        entries.forEach((entry, index) => {
+            const item = document.createElement("li");
+            item.className = "url-item";
+            if (index === nextIndex && !paused) item.classList.add("current");
+            if (entry.opened) item.classList.add("opened");
+            if (!entry.url) item.classList.add("invalid");
+
+            const number = document.createElement("span");
+            number.className = "url-number";
+            number.textContent = `${index + 1}.`;
+
+            const text = document.createElement("span");
+            text.className = `url-text${entry.url ? "" : " invalid"}`;
+            text.textContent = entry.raw;
+            text.title = entry.raw;
+
+            const status = document.createElement("span");
+            status.className = "url-status";
+            status.textContent = entry.opened ? "已打开" : !entry.url ? "格式无效" : index === nextIndex && !paused ? "下一条" : "待打开";
+
+            item.append(number, text, status);
+            urlList.append(item);
+        });
+    }
+
+    function recognizeUrls() {
+        entries = getUrlTokens().map(raw => ({ raw, url: parseUrl(raw), opened: false }));
+        paused = false;
+        message.classList.remove("error");
+        const invalidCount = entries.filter(entry => !entry.url).length;
+        message.textContent = entries.length === 0
+            ? "粘贴网址后，页面会自动编号并识别有效链接。"
+            : `已识别 ${entries.length} 个网址` + (invalidCount ? `，其中 ${invalidCount} 个格式无效。` : "，可开始逐个打开。");
+        render();
+    }
+
+    function openNext() {
+        if (paused) return;
+        const index = getNextIndex();
+        if (index === -1) return;
+
+        const entry = entries[index];
+        const newTab = window.open(entry.url, "_blank");
+        if (!newTab) {
+            message.textContent = `第 ${index + 1} 个网址被浏览器拦截；允许弹出式窗口后，再点“打开下一个”重试。`;
+            message.classList.add("error");
+            return;
+        }
+
+        newTab.opener = null;
+        entry.opened = true;
+        message.classList.remove("error");
+        const nextIndex = getNextIndex();
+        message.textContent = nextIndex === -1
+            ? `已打开全部 ${entries.filter(item => item.opened).length} 个有效网址。`
+            : `已打开第 ${index + 1} 个，下一条是第 ${nextIndex + 1} 个。`;
+        render();
+    }
+
+    function togglePause() {
+        paused = !paused;
+        message.classList.remove("error");
+        message.textContent = paused ? "队列已暂停；继续后会从当前下一条接着打开。" : "队列已继续，可以打开下一条。";
+        render();
+    }
+
+    function clearQueue() {
+        urlInput.value = "";
+        entries = [];
+        paused = false;
+        message.classList.remove("error");
+        message.textContent = "粘贴网址后，页面会自动编号并识别有效链接。";
+        render();
+        urlInput.focus();
+    }
+
+    urlInput.addEventListener("input", recognizeUrls);
+    openButton.addEventListener("click", openNext);
+    pauseButton.addEventListener("click", togglePause);
+    clearButton.addEventListener("click", clearQueue);
+    recognizeUrls();
+</script>
+</body>
+</html>
